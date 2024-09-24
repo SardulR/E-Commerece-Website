@@ -1,284 +1,292 @@
 const port = 4000;
 const express = require("express");
-var app = express();
-const mongoose = require("mongoose"); //MongoDB ORM
-const jwt = require("jsonwebtoken"); // JSON Web Token for authentication
-const multer = require("multer"); //  Middleware for handling multipart/form-data
+const app = express();
+const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
+const multer = require("multer");
 const path = require("path");
-const cors = require("cors"); //  Cross Origin Resource Sharing (CORS) middleware for node.js
-const { error, log } = require("console");
+const cors = require("cors");
+const exp = require("constants");
 const { type } = require("os");
+const { deflate } = require("zlib");
+const { error } = require("console");
 
-app.use(express.json()); //  Parse incoming requests with JSON payloads and return responses with JSON payloads
-app.use(cors()); //
+app.use(express.json()); //request to response that will automatically pass through the json
+app.use(cors()); //react project connect to express app to 4000 port
 
-// Database connection with  MongoDB
-mongoose.connect(
-  "mongodb+srv://shardulkurupath:project2004@cluster0.mx5nyoq.mongodb.net/e-commerce"
-);
-
-// API creation
-app.get("/", (req, res) => {
-  res.send({ message: "Welcome to eCommerce API!" });
-});
-
-// Image storage engine
-const storage = multer.diskStorage({
- 
-  destination: "./upload/images",
-
-  
-  filename: (req, file, cb) => {
-    // Callback function 
-    return cb(
-      null,
-   
-      `${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`
-    );
-  },
-});
-
-
-const upload = multer({ storage: storage });
-
-
-app.use("/images", express.static("upload/images"));
-
-app.post("/upload", upload.single("product"), (req, res) => {
- 
-  res.json({
-    success: 1,
-    
-    image_url: `http://localhost:${port}/images/${req.file.filename}`,
+// Database connection with MongoDB
+mongoose.connect("mongodb+srv://ecommerceweb:ecom1234@cluster0.553bf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  }).then(() => {
+    console.log('Connected to MongoDB');
+  }).catch(err => {
+    console.error('MongoDB connection error:', err);
   });
-});
+//mongoose.connect("mongodb+srv://ecommerceweb:<db_password>@cluster0.553bf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0");
+
+//API creation
+
+app.get("/",(req,res)=>{
+    res.send("Express App is Running")
+})
+
+//Image Storage Engine
+
+const storage = multer.diskStorage({
+    destination: './upload/images',
+    filename: (req,file,cb)=>{
+        return cb(null,`${file.fieldname}_${Date.now()}${path.extname(file.originalname)}`)
+    }
+})
+
+const upload = multer({storage:storage})
+
+//Creating Upload Endpoint for images
+
+app.use('/images',express.static('upload/images'))
+
+app.post("/upload",upload.single('product'),(req,res)=>{
+    res.json({
+        success:1,
+        image_url:`http://localhost:${port}/images/${req.file.filename}`
+    })
+})
 
 // Schema for creating products
-const Product = mongoose.model("Product", {
-  id: {
-    type: Number,
-    require: true,
-  },
-  name: {
-    type: String,
-    require: true,
-  },
-  image: {
-    type: String,
-    require: true,
-  },
-  category: {
-    type: String,
-    require: true,
-  },
-  new_price: {
-    type: Number,
-    require: true,
-  },
-  old_price: {
-    type: Number,
-    require: true,
-  },
-  date: {
-    type: Date,
-    default: Date.now,
-  },
-  avilable: {
-    type: Boolean,
-    default: true,
-  },
-});
 
-app.post("/addproduct", async (req, res) => {
-  let products = await Product.find({});
-  let id;
-  if (products.length > 0) {
-    let last_product_array = products.slice(-1);
-    let last_product = last_product_array[0];
-    id = last_product.id + 1;
-  } else {
-    id = 1;
-  }
-  const product = new Product({
-    id: id,
-    name: req.body.name,
-    image: req.body.image,
-    category: req.body.category,
-    new_price: req.body.new_price,
-    old_price: req.body.old_price,
-  });
-  console.log(product);
-  await product.save();
-  console.log("Saved");
-
-  res.json({
-    success: true,
-    name: req.body.name,
-  });
-});
-
-// Creating API for deleting
-app.post("/removeproduct", async (req, res) => {
-  await Product.findOneAndDelete({ id: req.body.id });
-  console.log("Removed");
-  res.json({
-    success: true,
-    name: req.body.name,
-  });
-});
-
-// Creating API for getting all product
-app.get(
-  "/allproducts",
-  async (req, res) => {
-    let products = await Product.find({});
-    console.log("All Products Fetched");
-    res.send(products);
-  },
-  []
-);
-
-// schema creating for User model
-const Users = mongoose.model("Users", {
-  name: {
-    type: String,
-  },
-  email: {
-    type: String,
-    unique: true,
-  },
-  password: {
-    type: String,
-  },
-  cartData: {
-    type: Object,
-  },
-  date: {
-    type: Date,
-    default: Date.now,
-  },
-});
-
-// creating Endpoint for register the user
-app.post("/signup", async (req, res) => {
-  let check = await Users.findOne({ email: req.body.email });
-  if (check) {
-    return res
-      .status(400)
-      .json({ success: false, errors: "Email already exists" });
-  }
-  let cart = {};
-  for (let i = 0; i < 300; i++) {
-    cart[i] = 0;
-  }
-  const user = new Users({
-    name: req.body.username,
-    email: req.body.email,
-    password: req.body.password,
-    cartData: cart,
-  });
-  await user.save();
-
-  const data = {
-    user: {
-      id: user.id,
+const Product = mongoose.model("Product",{
+    id:{
+        type:Number,
+        required:true,
     },
-  };
-  const token = jwt.sign(data, "secret_ecom");
-  res.json({ success: true, token });
-});
+    name:{
+        type:String,
+        required:true,
+    },
+    image:{
+        type:String,
+        required:true,
+    },
+    category:{
+        type:String,
+        required:true,
+    },
+    new_price:{
+        type:Number,
+        required:true,
+    },
+    old_price:{
+        type:Number,
+        required:true,
+    },
+    date:{
+        type:Date,
+        default:Date.now,
+    },
+    avilable:{
+        type:Boolean,
+        default:true,
+    },
+})
 
-//creating endpoint for user login
-app.post("/login", async (req, res) => {
-  let user = await Users.findOne({ email: req.body.email });
-  if (user) {
-    const passCompare = req.body.password == user.password;
-    if (passCompare) {
-      const data = {
-        user: { id: user.id },
-      };
-      const token = jwt.sign(data, "secret_ecom");
-      res.json({ success: true, token });
-    } else {
-      res.json({ success: false, errors: "Wrong Password" });
+//add the product to database
+
+app.post('/addproduct',async (req,res)=>{
+    // generate id automatically
+    let products = await Product.find({});
+    let id;
+    if(products.length>0)
+    {
+        let last_product_array = products.slice(-1);
+        let last_product = last_product_array[0];
+        id = last_product.id+1;
     }
-  } else {
-    res.json({ success: false, errors: "Wrong Email Id" });
-  }
-});
+    else{
+        id=1;
+    }
+    const product = new Product({
+        id:id,
+        name:req.body.name,
+        image:req.body.image,
+        category:req.body.category,
+        new_price:req.body.new_price,
+        old_price:req.body.old_price,
+    });
+    console.log(product);
+    await product.save();
+    console.log("Saved");
+    res.json({
+        success:true,
+        name:req.body.name,
+    })
+})
 
-// Creating endpoint for newcollection data
-app.get("/newcollections", async (req, res) => {
-  let products = await Product.find({});
-  let newcollection = products.slice(1).slice(-8); // lấy ra 8 item cuối list
-  console.log("NewCollection Fetched");
-  res.send(newcollection);
-});
+//Creating API for deleting Products
+app.post('/removeproduct',async (req,res)=>{
+    await Product.findOneAndDelete({id:req.body.id});
+    console.log("Removed");
+    res.json({
+        success:true,
+        name:req.body.name
+    })
+})
 
-// Creating endpoint for popular in women section
-app.get(
-  "/popularinwomen",
-  async (req, res) => {
-    let products = await Product.find({ category: "women" });
-    let popular_in_women = products.slice(0, 4);
+//Creating API for getting all Products
+app.get('/allproducts',async (req,res)=>{
+    let products = await Product.find({});
+    console.log("All products Fetched");
+    res.send(products);
+    //res.send("Express App is running")
+})
+
+//Schema creating for user model
+
+const Users = mongoose.model('Users',{
+    name:{
+        type:String,
+    },
+    email:{
+        type:String,
+        unique:true,
+    },
+    password:{
+        type:String,
+    },
+    cartData:{
+        type:Object,
+    },
+    date:{
+        type:Date,
+        deflate:Date.now,
+    }
+})
+
+// Creating Endpoint for Registering 
+// check user have account
+app.post('/signup',async (req,res)=>{
+    let check = await Users.findOne({email:req.body.email});
+    if(check){
+        return res.status(400).json({success:false,errors:"existing user found with same email address"})
+    }
+    // if no user create empty cart
+    let cart = {};
+    for (let i = 0; i < 300; i++){
+        cart[i] = 0;
+    }
+    // create user
+    const user = new Users({
+        name:req.body.username,
+        email:req.body.email,
+        password:req.body.password,
+        cartData:cart,
+    })
+
+    // save user
+    await user.save();
+
+    // creating token with data
+    const data = {
+        user:{
+            id:user.id
+        }
+    }
+
+    //create token will not be readable
+    const token = jwt.sign(data,'secret_ecom');
+    res.json({success:true,token})
+
+})
+
+// creating end point for user login
+app.post('/login', async (req,res)=>{
+    let user = await Users.findOne({email:req.body.email});
+    // Comparing the password
+    if (user) {
+        const passCompare = req.body.password == user.password;
+        if(passCompare) {
+            const data = {
+                user:{
+                    id:user.id
+                }
+            }
+            const token = jwt.sign(data,'secret_ecom');
+            res.json({success:true,token});
+        }
+        else{
+            res.json({success:false,errors:"Wrong Password"});
+        }
+    }
+    else{
+        res.json({success:false,errors:"Wrong Email Id"})
+    }
+})
+
+// creating endpoint for newcollection data
+app.get('/newcollections',async (req,res)=>{
+    let products = await Product.find({});
+    let newcollection = products.slice(1).slice(-8);
+    console.log("NewCollection Fetched");
+    res.send(newcollection);
+})
+
+//creating endpoint for popular in women section
+app.get('/popularinwomen', async (req,res)=>{
+    let products = await Product.find({category:"women"});
+    let popular_in_women = products.slice(0,4);
     console.log("Popular in women fetched");
     res.send(popular_in_women);
-  },
-  []
-);
+})
 
-// creating middeware to fetch user
-const fetchUser = async (req, res, next) => {
-  const token = req.header("auth-token");
-  if (!token) {
-    res.status(401).json({ errors: "Please authenticate using valid token" });
-  } else {
-    try {
-      const data = jwt.verify(token, "secret_ecom");
-      req.user = data.user;
-      next();
-    } catch (error) {
-      res.status(401).send({ errors: "Please authenticate using valid token" });
+// creating middleware to fetch user
+    const fetchUser = async (req,res,next)=>{
+        const token = req.header('auth-token');
+        if(!token) {
+            res.status(401).send({errors:"Please authenticate using valid token"});
+        }
+        else{
+            try{
+                const data = jwt.verify(token,'secret_ecom');
+                req.user = data.user;
+                next();
+            }
+            catch (error){
+                res.status(401).send({errors:"please authenticate using a valid token"});
+            }
+        }
     }
-  }
-};
 
 // creating endpoint for adding products in cartdata
-app.post("/addtocart", fetchUser, async (req, res) => {
-  console.log("Added", req.body.itemId);
-  let userData = await Users.findOne({ _id: req.user.id });
-  userData.cartData[req.body.itemId] += 1;
-  await Users.findOneAndUpdate(
-    { _id: req.user.id },
-    { cartData: userData.cartData }
-  );
-  res.send("Added");
-});
+app.post('/addtocart',fetchUser,async (req,res)=>{
+    console.log("Added",req.body.itemId);
+    let userData = await Users.findOne({_id:req.user.id});
+    userData.cartData[req.body.itemId] += 1;
+    await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData});
+    res.send("Added")
+})
 
-// creating endpoint for  remove product from cartdata
-app.post("/removefromcart", fetchUser, async (req, res) => {
-  console.log("Removed", req.body.itemId);
-  let userData = await Users.findOne({ _id: req.user.id });
-  if (userData.cartData[req.body.itemId] > 0)
+// creating endpoint remove product from cartdata
+app.post('/removefromcart',fetchUser,async (req,res)=>{
+    console.log("removed",req.body.itemId);
+    let userData = await Users.findOne({_id:req.user.id});
+    if(userData.cartData[req.body.itemId]>0)
     userData.cartData[req.body.itemId] -= 1;
-  await Users.findOneAndUpdate(
-    { _id: req.user.id },
-    { cartData: userData.cartData }
-  );
-  res.send("Removed");
-});
+    await Users.findOneAndUpdate({_id:req.user.id},{cartData:userData.cartData});
+    res.send("Removed")
+})
 
-// creating endpoint to get cart data
-app.post("/getcart", fetchUser, async (req, res) => {
-  console.log("Get Cart");
-  let userData = await Users.findOne({ _id: req.user.id });
-  res.json(userData.cartData);
-});
+// creating endpoint to get cartdata
+app.post('/getcart',fetchUser,async (req,res)=>{
+    console.log("GetCart");
+    let userData = await Users.findOne({_id:req.user.id});
+    res.json(userData.cartData);
+})
 
-app.listen(port, (error) => {
-  if (!error) {
-    console.log(`Server  is listening on ${port}`);
-  } else {
-    console.log("Error : ", error);
-  }
-});
+app.listen(port,(error)=>{
+    if(!error){
+        console.log("Server Running on port "+port)
+    }
+    else{
+        console.log("Error : "+error)
+    }
+})
